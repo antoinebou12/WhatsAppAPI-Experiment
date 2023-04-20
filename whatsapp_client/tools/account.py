@@ -1,5 +1,5 @@
 import os.path
-from whatsapp_api_client_python.response import Response
+from whatsapp_client.response import Response
 
 
 class Account:

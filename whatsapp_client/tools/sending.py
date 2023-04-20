@@ -1,7 +1,7 @@
 from array import array
 import os.path
 import mimetypes
-from whatsapp_api_client_python.response import Response
+from whatsapp_client.response import Response
 
 
 class Sending:

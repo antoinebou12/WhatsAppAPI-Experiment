@@ -1,4 +1,4 @@
-from whatsapp_api_client_python.response import Response
+from whatsapp_client.response import Response
 
 class Journals:
     def __init__(self, greenApi) -> None:

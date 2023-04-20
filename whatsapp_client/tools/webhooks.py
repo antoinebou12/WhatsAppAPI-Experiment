@@ -10,7 +10,6 @@ class Webhooks:
     def stopReceivingNotifications(self) -> bool:
         self.started = False
 
-    
     def job(self, onEvent) -> None:
         print('Incoming notifications are being received. '\
         'To interrupt, press Ctrl+C')
