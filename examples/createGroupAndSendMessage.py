@@ -9,17 +9,17 @@ def main():
     chatIds = [
         "11001234567@c.us"
     ]
-    resultCreate = greenAPI.groups.createGroup('GroupName', 
+    resultCreate = greenAPI.groups.createGroup('GroupName',
         chatIds)
 
     if resultCreate.code == 200:
         print(resultCreate.data)
-        resultSend = greenAPI.sending.sendMessage(resultCreate.data['chatId'], 
+        resultSend = greenAPI.sending.sendMessage(resultCreate.data['chatId'],
             'Message text')
         if resultSend.code == 200:
             print(resultSend.data)
         else:
-            print(resultSend.error)    
+            print(resultSend.error)
     else:
         print(resultCreate.error)
 
