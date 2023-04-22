@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    volumes:
+      - logs:/app/logs
+      - attachments:/app/attachments
+    command: npm start
+
+volumes:
+  logs:
+  attachments:

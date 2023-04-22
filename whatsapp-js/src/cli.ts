@@ -5,6 +5,24 @@ import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import axios from 'axios';
 import { decode } from 'entities';
+import { fetchTriviaQuestion, Trivia } from './trivia';
+import { fetchRandomJoke } from './jokes';
+import winston from 'winston';
+import { generateResponse } from './openai';
+
+// Créer le logger avec winston
+const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.printf(({ timestamp, level, message }) => {
+            return `[${timestamp}] ${level}: ${message}`;
+        })
+    ),
+    transports: [
+        new winston.transports.File({ filename: 'logs.log' }),
+    ],
+});
 
 const parsedArgv = yargs(hideBin(process.argv))
     .scriptName('whatsapp-cli')
@@ -20,16 +38,27 @@ const parsedArgv = yargs(hideBin(process.argv))
         description: 'QR code file path',
         default: 'qr_code.png',
     })
+    .options('headless', {
+        alias: 'v',
+        type: 'boolean',
+        description: 'Run headless',
+        default: true,
+    })
+    .options('help', {
+        alias: 'h',
+        type: 'boolean',
+        description: 'Show help',
+    })
     .help('h')
     .alias('h', 'help')
     .argv;
 
-const argv = parsedArgv as { [x: string]: unknown; save: boolean | undefined; file: string; _: (string | number)[]; $0: string; };
+const argv = parsedArgv as { [x: string]: unknown; save: boolean | undefined; file: string; _: (string | number)[]; $0: string; headless: boolean | undefined; help: boolean | undefined; };
 
 const client = new Client({
     authStrategy: new NoAuth(),
     puppeteer: {
-        headless: false,
+        headless: argv.headless,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -50,9 +79,9 @@ client.on('qr', (qr) => {
 
         qrcode.toFile(filePath, qr, { type: 'png' }, (err: Error | null) => {
             if (err) {
-                console.error('Failed to save QR code to file:', err);
+                logger.error('Failed to save QR code to file:', err);
             } else {
-                console.log(`QR code saved to ${filePath}. Scan it with your phone.`);
+                logger.info(`QR code saved to ${filePath}. Scan it with your phone.`);
             }
         });
     } else {
@@ -61,91 +90,105 @@ client.on('qr', (qr) => {
 });
 
 client.on('ready', () => {
-    console.log('Client is ready!');
+    logger.info('Client is ready!');
 });
 
+let currentTrivia: Trivia | null = null;
+
 client.on('message', async (msg) => {
-    if (msg.body === '!ping') {
-        msg.reply('pong');
-    }
-
-    if (msg.hasMedia) {
-        const attachmentData = await msg.downloadMedia();
-
-        // Save the attachment
-        if (attachmentData) {
-            const filename = `./media/${attachmentData.filename}`;
-            fs.writeFile(filename, attachmentData.data, { encoding: 'base64' }, (err) => {
-                if (err) {
-                    console.error('Failed to save attachment:', err);
-                } else {
-                    console.log(`Attachment saved to ${filename}`);
-                }
-            });
-        }
-    }
-});
-
-interface Trivia {
-    message: string;
-    correctAnswer: string;
-}
-
-interface TriviaResult {
-    question: string;
-    correct_answer: string;
-    incorrect_answers: string[];
-}
-
-
-async function fetchTriviaQuestion(): Promise<Trivia | null> {
-    try {
-        const response = await axios.get('https://opentdb.com/api.php?amount=1&type=multiple');
-        const result: TriviaResult = response.data.results[0];
-
-        const question = decode(result.question);
-        const correctAnswer = decode(result.correct_answer);
-        const incorrectAnswers = result.incorrect_answers.map((answer: string) => decode(answer));
-
-        const options = [correctAnswer, ...incorrectAnswers];
-        const message = `Trivia Question: ${question}\n\nOptions:\n${options.map((option, index) => `${index + 1}. ${option}`).join('\n')}`;
-
-        return { message, correctAnswer };
-    } catch (error) {
-        console.error('Failed to fetch trivia question:', error);
-        return null;
-    }
-}
-
-// Modify the 'client.on('message', ...)' event listener to send a trivia question when '!trivia' is sent
-client.on('message', async (msg) => {
+    logger.info('Received message:', msg.body);
+    logger.debug('Message:', msg);
     if (msg.hasMedia) {
         try {
             const attachmentData = await msg.downloadMedia();
 
             // Save the attachment
             if (attachmentData) {
-                const filename = `./media/${attachmentData.filename}`;
-                await fs.promises.writeFile(filename, attachmentData.data, { encoding: 'base64' });
-                console.log(`Attachment saved to ${filename}`);
+                if (attachmentData.mimetype === 'image/jpeg') {
+                    const fileName = `./attachments/${msg.id}.jpg`;
+                    fs.writeFileSync(fileName, attachmentData.data, 'base64');
+                    logger.info(`Saved attachment to ${fileName}`);
+                }
+                if (attachmentData.mimetype === 'image/png') {
+                    const fileName = `./attachments/${msg.id}.png`;
+                    fs.writeFileSync(fileName, attachmentData.data, 'base64');
+                    logger.info(`Saved attachment to ${fileName}`);
+                }
+                if (attachmentData.mimetype === 'video/mp4') {
+                    const fileName = `./attachments/${msg.id}.mp4`;
+                    fs.writeFileSync(fileName, attachmentData.data, 'base64');
+                    logger.info(`Saved attachment to ${fileName}`);
+                }
+                if (attachmentData.mimetype === 'audio/mp3') {
+                    const fileName = `./attachments/${msg.id}.mp3`;
+                    fs.writeFileSync(fileName, attachmentData.data, 'base64');
+                    logger.info(`Saved attachment to ${fileName}`);
+                }
+                if (attachmentData.mimetype === 'application/pdf') {
+                    const fileName = `./attachments/${msg.id}.pdf`;
+                    fs.writeFileSync(fileName, attachmentData.data, 'base64');
+                    logger.info(`Saved attachment to ${fileName}`);
+                }
+                if (attachmentData.mimetype === 'application/zip') {
+                    const fileName = `./attachments/${msg.id}.zip`;
+                    fs.writeFileSync(fileName, attachmentData.data, 'base64');
+                    logger.info(`Saved attachment to ${fileName}`);
+                }
             }
         } catch (err) {
-            console.error('Failed to save attachment:', err);
+            logger.error('Failed to save attachment:', err);
         }
+    }
+
+    if (msg.body.startsWith('!askai')) {
+        const prompt = msg.body.slice(6).trim();
+        const response = await generateResponse(prompt);
+        msg.reply(response);
+    }
+
+    if (msg.body.startsWith('!word')) {
+        const word = msg.body.slice(6).trim();
+        const definition = await fetchWordDefinition(word);
+        if (definition) {
+            msg.reply(definition);
+        } else {
+            msg.reply('Failed to fetch definition. Please try again.');
+        }
+    }
+
+    if (msg.body === '!help') {
+        msg.reply('Available Commands: !ping, !joke, !trivia, !answer');
     }
 
     if (msg.body === '!ping') {
         msg.reply('pong');
     }
 
-    console.log('Received message:', msg.body);
+    if (msg.body === '!joke') {
+        const joke = await fetchRandomJoke();
+        if (joke) {
+            msg.reply(joke);
+        } else {
+            msg.reply('Failed to fetch a joke. Please try again.');
+        }
+    }
+
     if (msg.body === '!trivia') {
         console.log('Sending trivia question...');
         const trivia = await fetchTriviaQuestion();
         if (trivia) {
+            currentTrivia = trivia;
             msg.reply(trivia.message);
         } else {
             msg.reply('Failed to fetch a trivia question. Please try again.');
+        }
+    } else if (msg.body === '!answer' && currentTrivia) {
+        // Check if the user's answer matches the correct answer (case insensitive)
+        if (msg.body.trim().toLowerCase() === currentTrivia.correctAnswer.toLowerCase()) {
+            msg.reply('Congratulations! You answered correctly.');
+            currentTrivia = null; // Reset the trivia question
+        } else {
+            msg.reply('Incorrect answer. Please try again.');
         }
     }
 });
