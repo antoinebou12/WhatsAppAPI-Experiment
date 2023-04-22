@@ -10,11 +10,12 @@ class Webhooks:
         self.console = Console()
 
     def _make_request(self, method, endpoint, payload=None, files=None):
-        time.sleep(20)  # Add a tiny sleep
-        return self.greenApi.request(method, f"{{{{host}}}}/waInstance{{{{idInstance}}}}{endpoint}/{{{{apiTokenInstance}}}}", payload, files)
+        time.sleep(3)  # Add a tiny sleep
+        return self.greenApi.request(method,'{{host}}/waInstance{{idInstance}}/receiveNotification/{{apiTokenInstance}}', payload, files)
 
     def startReceivingNotifications(self, onEvent) -> bool:
         self.started = True
+        print('Starting receiving notifications')
         self.job(onEvent)
 
     def stopReceivingNotifications(self) -> bool:
@@ -30,12 +31,12 @@ class Webhooks:
                     if resultReceive.data is None:
                         # There are no incoming notifications,
                         # we send the request again
-                        time.sleep(0.1)  # Add a tiny sleep
+                        time.sleep(1)  # Add a tiny sleep
                         continue
                     body = resultReceive.data['body']
                     typeWebhook = body['typeWebhook']
                     onEvent(typeWebhook, body)
-                    self._make_request('DELETE', '/deleteNotification', {'receiptId': resultReceive.data['receiptId']})
+                    # self._make_request('DELETE', '/deleteNotification/{0}'.format(resultReceive.data['receiptId']))
             print('End receiving')
         except KeyboardInterrupt:
             print('End receiving')

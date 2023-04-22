@@ -27,8 +27,6 @@ class WhatsAppClient:
 
     def send_file(self, recipient_number: str, file_path: str):
         result = self.greenAPI.sending.sendFile(chatId=f'{recipient_number}@c.us', urlFile=file_path)
-    console.print(f"Send result: [bold]{result.data}[/bold]")
-        result = self.greenAPI.sending.sendFile(chatId=f'{recipient_number}@c.us', urlFile=file_path)
         console.print(f"Send result: [bold]{result.data}[/bold]")
 
     def send_button(self, recipient_number: str, message: str, buttons: list):
@@ -36,22 +34,28 @@ class WhatsAppClient:
         console.print(f"Send result: [bold]{result.data}[/bold]")
 
     def on_event(self, type_webhook, body):
-            if type_webhook == "incomingMessageReceived":
+            if type_webhook == "outgoingMessageStatus":
                 client.process_received_message(body)
-                notification_id = body["notificationId"]  # Replace this with the actual field name for the notification ID in the webhook data
-                self.greenAPI.deleteNotification(notification_id)
 
     def receive_notification(self):
         self.greenAPI.webhooks.startReceivingNotifications(self.on_event)
 
     def process_received_message(self, body):
-        if "triva" in body["messageData"]["text"].lower():
-            recipient_number = body["senderData"]["id"]
-            self.send_trivia_question(recipient_number)
-        elif "answer" in body["messageData"]["text"].lower():
-            recipient_number = body["senderData"]["id"]
-            selected_option = body["messageData"]["text"].split()[-1]
-            self.send_correct_answer(recipient_number, selected_option)
+        print(body)
+
+
+    def get_last_outgoing_messages(self):
+        result = self.greenAPI.journals.lastOutgoingMessages()
+        console.print(f"Last outgoing messages: [bold]{result.data}[/bold]")
+        return result.data
+
+    def get_chat_history(self, recipient_number: str):
+        result = self.greenAPI.journals.chatHistory(chatId=f'{recipient_number}@c.us', count=200)
+
+    def get_last_incoming_messages(self):
+        result = self.greenAPI.journals.lastIncomingMessages()
+        console.print(f"Last incoming messages: [bold]{result.data}[/bold]")
+        return result.data
 
     def send_trivia_question(self, recipient_number: str):
         with httpx.Client() as client:
@@ -184,7 +188,7 @@ def receive_notifications():
     if client is None:
         console.print("Please run the setup() function first.", style="bold red")
         raise typer.Exit(code=1)
-    client.receive_notification(client.process_received_message)
+    client.receive_notification()
 
 @app.command(
     help="Send a message and check for notifications"
@@ -196,7 +200,7 @@ def send_and_check_notifications(recipient_number: str, message: str):
         raise typer.Exit(code=1)
 
     client.send_message(recipient_number, message)
-    client.receive_notification(client.process_received_message)
+    client.receive_notification()
 
 @app.command(
     help="Send a message and check for notifications"
@@ -208,7 +212,33 @@ def send_and_check_notifications_trivia(recipient_number: str):
         raise typer.Exit(code=1)
 
     client.send_trivia_question(recipient_number)
-    client.receive_notification(client.process_received_message)
+    client.receive_notification()
+
+@app.command(
+    help="Get last incoming messages"
+)
+def get_last_messages():
+    """Get last incoming messages"""
+    if client is None:
+        console.print("Please run the setup() function first.", style="bold red")
+        raise typer.Exit(code=1)
+    client.get_last_incoming_messages()
+
+@app.command(
+    help="Get last incoming messages"
+)
+def get_last_messages_id(id: str):
+    """Get last incoming messages"""
+    if client is None:
+        console.print("Please run the setup() function first.", style="bold red")
+        raise typer.Exit(code=1)
+    if id:
+        messages = client.get_last_incoming_messages()
+        # find idMessage
+        for msg in messages:
+            if msg['idMessage'] == id:
+                console.print(msg)
+                return
 
 if __name__ == "__main__":
     app()
