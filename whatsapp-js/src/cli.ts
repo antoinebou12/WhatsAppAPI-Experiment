@@ -1,6 +1,6 @@
 import fs from 'fs';
 import qrcodeTerminal from 'qrcode-terminal';
-import { Client, NoAuth, MessageMedia } from 'whatsapp-web.js';
+import { Client, NoAuth, MessageMedia, Buttons } from 'whatsapp-web.js';
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import axios from 'axios';
@@ -9,6 +9,8 @@ import { fetchTriviaQuestion, Trivia } from './trivia';
 import { fetchRandomJoke } from './jokes';
 import winston from 'winston';
 import { generateResponse } from './openai';
+import { fetchWordDefinition } from './word';
+import { title } from 'process';
 
 // Créer le logger avec winston
 const logger = winston.createLogger({
@@ -79,7 +81,7 @@ client.on('qr', (qr) => {
 
         qrcode.toFile(filePath, qr, { type: 'png' }, (err: Error | null) => {
             if (err) {
-                logger.error('Failed to save QR code to file:', err);
+                logger.error('Failed to save QR code to file:' + err, err);
             } else {
                 logger.info(`QR code saved to ${filePath}. Scan it with your phone.`);
             }
@@ -95,9 +97,15 @@ client.on('ready', () => {
 
 let currentTrivia: Trivia | null = null;
 
+client.on('message_create', async (msg) => {
+    console.log('Received message:' + msg.body);
+    logger.info('Received message:' + msg.body);
+});
+
 client.on('message', async (msg) => {
-    logger.info('Received message:', msg.body);
-    logger.debug('Message:', msg);
+    console.log('Received message:' + msg.body);
+    logger.info('Received message:' + msg.body);
+    logger.debug('Message:' + msg);
     if (msg.hasMedia) {
         try {
             const attachmentData = await msg.downloadMedia();
@@ -136,7 +144,7 @@ client.on('message', async (msg) => {
                 }
             }
         } catch (err) {
-            logger.error('Failed to save attachment:', err);
+            logger.error('Failed to save attachment:' + err);
         }
     }
 
@@ -175,16 +183,32 @@ client.on('message', async (msg) => {
 
     if (msg.body === '!trivia') {
         console.log('Sending trivia question...');
+        logger.info('Sending trivia question...');
         const trivia = await fetchTriviaQuestion();
         if (trivia) {
             currentTrivia = trivia;
-            msg.reply(trivia.message);
+            let button = new Buttons(trivia.message,
+                [
+                    { id: '1', body: trivia.options[0] },
+                    { id: '2', body: trivia.options[1] },
+                    { id: '3', body: trivia.options[2] },
+                    { id: '4', body: trivia.options[3] },
+                ],
+                trivia.title,
+                'Select an option to answer the question',
+                );
+            msg.reply(button);
         } else {
             msg.reply('Failed to fetch a trivia question. Please try again.');
         }
-    } else if (msg.body === '!answer' && currentTrivia) {
+    }
+
+    if (currentTrivia && currentTrivia.options.some(option => msg.body.includes(option))) {
+        const answerNumber = parseInt(msg.body.split(' ')[1], 10) - 1;
+        const userAnswer = currentTrivia.options[answerNumber];
+
         // Check if the user's answer matches the correct answer (case insensitive)
-        if (msg.body.trim().toLowerCase() === currentTrivia.correctAnswer.toLowerCase()) {
+        if (userAnswer && userAnswer.trim().toLowerCase() === currentTrivia.correctAnswer.toLowerCase()) {
             msg.reply('Congratulations! You answered correctly.');
             currentTrivia = null; // Reset the trivia question
         } else {

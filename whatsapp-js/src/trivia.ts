@@ -2,8 +2,11 @@ import axios from 'axios';
 import { decode } from 'entities';
 
 interface Trivia {
-    message: string;
+    title: string;
+    question: string;
+    options: Array<string>;
     correctAnswer: string;
+    message: string;
 }
 
 interface TriviaResult {
@@ -29,9 +32,10 @@ async function fetchTriviaQuestion(
         const incorrectAnswers = result.incorrect_answers.map((answer: string) => decode(answer));
 
         const options = [correctAnswer, ...incorrectAnswers];
+        const title = 'Trivia Question';
         const message = `Trivia Question: ${question}\n\nOptions:\n${options.map((option, index) => `${index + 1}. ${option}`).join('\n')}`;
 
-        return { message, correctAnswer };
+        return { title, question, options, correctAnswer, message };
     } catch (error) {
         console.error('Failed to fetch trivia question:', error);
         return null;

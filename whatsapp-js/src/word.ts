@@ -22,7 +22,8 @@ export async function fetchWordDefinition(word: string): Promise<string | null> 
         const definition = response.data.results[0].lexicalEntries[0].entries[0].senses[0].definitions[0];
         return definition;
     } catch (error) {
-        if (error.response?.status === 404) {
+        let errorVar = error as Error & { response?: { status: number } };
+        if (errorVar.response?.status === 404) {
             console.error(`Word "${word}" not found.`);
         } else {
             console.error(`Failed to fetch definition for word "${word}":`, error);
